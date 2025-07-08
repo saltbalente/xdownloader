@@ -1,4 +1,4 @@
-const { YouTubeDl } = require('youtube-dl-exec');
+const youtubeDl = require('youtube-dl-exec');
 
 module.exports = async (req, res) => {
     const { url } = req.query;
@@ -8,8 +8,7 @@ module.exports = async (req, res) => {
     }
 
     try {
-        const ytDlp = new YouTubeDl();
-        const info = await ytDlp.exec(url, {
+        const info = await youtubeDl(url, {
             dumpSingleJson: true,
             noCheckCertificates: true,
             noWarnings: true,
