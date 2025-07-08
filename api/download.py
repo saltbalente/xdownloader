@@ -1,7 +1,8 @@
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import json
-import yt_dlp
+import subprocess
+import sys
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -21,29 +22,25 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            ydl_opts = {
-                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-                'noplaylist': True,
-                'quiet': True,
-                'no_warnings': True,
-                'dump_single_json': True,
-            }
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info_dict = ydl.extract_info(url, download=False)
-                
-            video_url = None
-            if 'formats' in info_dict and isinstance(info_dict['formats'], list):
-                for f in info_dict['formats']:
-                    if f.get('ext') == 'mp4' and f.get('url'):
-                        video_url = f['url']
-                        break
+            # Ejecutar yt-dlp con la opción --get-url para obtener la URL directa del video
+            # sys.executable -m yt_dlp asegura que se use el yt-dlp instalado en el entorno de Vercel
+            command = [sys.executable, '-m', 'yt_dlp', '--get-url', url]
+            
+            # Usar subprocess.run para capturar la salida estándar
+            result = subprocess.run(command, capture_output=True, text=True, check=True)
+            
+            video_url = result.stdout.strip()
 
             if video_url:
                 self.wfile.write(json.dumps({'videoUrl': video_url}).encode('utf-8'))
             else:
-                self.wfile.write(json.dumps({'error': 'No MP4 video URL found for the provided link.'}).encode('utf-8'))
+                self.wfile.write(json.dumps({'error': 'No video URL found for the provided link.'}).encode('utf-8'))
 
+        except subprocess.CalledProcessError as e:
+            # Capturar errores específicos de yt-dlp
+            print(f"yt-dlp error: {e.stderr}")
+            self.wfile.write(json.dumps({'error': 'Failed to extract video URL from yt-dlp.', 'details': e.stderr}).encode('utf-8'))
         except Exception as e:
+            # Capturar otros errores inesperados
             print(f"Error extracting video URL: {e}")
             self.wfile.write(json.dumps({'error': 'Failed to extract video URL.', 'details': str(e)}).encode('utf-8'))
